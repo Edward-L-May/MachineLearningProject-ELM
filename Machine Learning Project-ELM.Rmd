@@ -1,0 +1,94 @@
+---
+title: "Machine Learning Project-ELM"
+author: "Edward May"
+date: "June 7, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE, cache=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+###Load data
+
+```{r cars}
+testing <- read.csv("pml-testing.csv")
+training <- read.csv("pml-training.csv")
+#Subset training to only the columns that testing uses
+t1 <- training[,!is.na(testing[2,])]
+```
+
+## Variable Correlation
+
+are the variables highly correlated?
+
+```{r pressure, echo=FALSE}
+library(corrplot)
+corMT <- cor(t1[,8:59])
+corrplot(corMT, method="color", type="lower", order="FPC")
+```
+
+We will use a Random forest model and iterate 50 times
+
+
+```{r}
+library(caret)
+set.seed(123)
+# Since the data is sorted by the classe, we can't use the time or X values 
+# as those data are not available in the testing data set
+fit <- train(classe~.,data=t1[,8:60],method="rf",ntree=50, 
+             trControl=trainControl(method="cv", number = 10, classProbs = TRUE,
+                          savePredictions = TRUE),
+             verbose=TRUE)
+plot(fit$finalModel)
+
+```
+```{r}
+fit$finalModel  
+```
+
+```{r}
+fit$results
+
+```
+
+This was sucessful to 99.4% accuracy!
+
+```{r}
+library(rattle)
+#fancyRpartPlot(t$finalModel)
+```
+
+##Important Variables
+
+```{r}
+library(randomForest)
+
+varImpPlot(fit$finalModel, 
+  sort = TRUE,  cex=.8,
+  main="Variable Usefulness based on Gini")
+```
+
+##Final Tree
+
+```{r}
+library(rpart)
+library(rpart.plot)
+treeModel <- rpart(classe ~ ., data=t1[,8:60], method="class")
+rpart.plot(treeModel,cex = .5,type = 5)
+```
+
+##Example shape functions for the choice being "A"
+```{r ,echo=FALSE}
+library(plotmo)
+plotmo(fit, type="prob", nresponse="A")
+```
+
+```{r}
+predict(fit,testing)
+```
+
