@@ -1,0 +1,119 @@
+---
+title: "Machine Learning Project-ELM"
+author: "Edward May"
+date: "June 7, 2018"
+output: html_document
+---
+
+```{r setup, cache=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("~/Coursera/Machine Learning/Project")
+```
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+###Load data
+
+```{r }
+testing <- read.csv("pml-testing.csv")
+training <- read.csv("pml-training.csv")
+#Subset training to only the columns that testing uses
+t1 <- training[,!is.na(testing[2,])]
+library(caret)
+##Split the data set for cross-validation
+inTrain <- createDataPartition(y=t1$classe,p=.9,list=FALSE)
+training <- t1[inTrain,]
+testing <- t1[-inTrain,]
+dim(training)
+dim(testing)
+```
+
+## Variable Correlation
+
+are the variables highly correlated?
+
+```{r}
+library(corrplot)
+corMT <- cor(training[,8:59])
+corrplot(corMT, method="color", type="lower", order="FPC",tl.cex = .6)
+```
+
+From this plot there doesn't seem to be any highly correlated variables, so we will keep them all in.
+
+Looking through the data, it would probably be best if we could compare the shapes of the variable plots through the time of each motion since that is probably how the motions were rated as a whole, but the test data only has a single row of variables, not time series plots, so that will not help.
+
+We will fit a random forest model and iterate 50 times.  Random forest combines decision trees and bagging to obtain a slightly better solution.
+
+```{r}
+
+library(randomForest)
+
+# Since the data is sorted by the classe, we can't use the time or X values 
+# as those data are not available in the testing data set
+if(!file.exists("fit.rds")) {
+    set.seed(123)
+    fit <- train(classe~.,data=training[,8:60],method="rf",ntree=50,
+                 trControl=trainControl(method="cv", number = 10,
+                                        classProbs = TRUE,
+                                        savePredictions = TRUE),
+             verbose=TRUE)
+    saveRDS(fit, file='fit.rds')
+} else {
+    fit <- readRDS('fit.rds')
+}
+
+plot(fit$finalModel)
+
+```
+
+
+```{r}
+fit$finalModel  
+```
+The out of bounds error rate of 0.58% is very good!
+
+
+```{r}
+fit$results
+
+```
+
+This was sucessful to 99.4% accuracy!
+
+##Important Variables
+
+```{r}
+
+
+varImpPlot(fit$finalModel, 
+  sort = TRUE,  cex=.8,
+  main="Variable Usefulness based on Gini")
+```
+
+##Cross-validation:
+
+
+```{r}
+predTest <- predict(fit, newdata=testing)
+confMat <- confusionMatrix(predTest, testing$classe)
+confMat
+```
+
+
+
+##Example shape functions for the choice being "A"
+
+```{r ,echo=FALSE}
+library(plotmo)
+plotmo(fit, type="prob", nresponse="A")
+```
+
+```{r}
+answer <- data.frame(input=1:20,classe=predict(fit,testing),
+                prob=apply(predict(fit,testing,type = "prob"),1,max)
+)
+print(answer)
+```
+
