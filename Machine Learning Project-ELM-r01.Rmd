@@ -25,9 +25,9 @@ library(caret)
 ##Split the data set for cross-validation
 inTrain <- createDataPartition(y=t1$classe,p=.9,list=FALSE)
 training <- t1[inTrain,]
-testing <- t1[-inTrain,]
+testset <- t1[-inTrain,]
 dim(training)
-dim(testing)
+dim(testset)
 ```
 
 ## Variable Correlation
@@ -96,8 +96,8 @@ varImpPlot(fit$finalModel,
 
 
 ```{r}
-predTest <- predict(fit, newdata=testing)
-confMat <- confusionMatrix(predTest, testing$classe)
+predTest <- predict(fit, testset)
+confMat <- confusionMatrix(predTest, testset$classe)
 confMat
 ```
 
